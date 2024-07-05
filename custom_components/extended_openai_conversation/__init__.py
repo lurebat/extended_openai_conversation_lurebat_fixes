@@ -288,7 +288,7 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
     def get_functions(self):
         try:
             function = self.entry.options.get(CONF_FUNCTIONS)
-            result = yaml.safe_load(function) if function else DEFAULT_CONF_FUNCTIONS
+            result = yaml.safe_load(function) if function else yaml.safe_load(DEFAULT_CONF_FUNCTIONS)
             if result:
                 for setting in result:
                     function_executor = get_function_executor(

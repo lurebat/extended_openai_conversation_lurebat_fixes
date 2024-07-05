@@ -13,23 +13,41 @@ EVENT_AUTOMATION_REGISTERED = "automation_registered_via_extended_openai_convers
 EVENT_CONVERSATION_FINISHED = "extended_openai_conversation.conversation.finished"
 
 CONF_PROMPT = "prompt"
-DEFAULT_PROMPT = """I want you to act as smart home manager of Home Assistant.
-I will provide information of smart home along with a question, you will truthfully make correction or answer using information provided in one sentence in everyday language.
-
-Current Time: {{now()}}
+DEFAULT_PROMPT = """The Current Time is: {{now()}}, if you are asked about it, format it in human readable format
 
 Available Devices:
 ```csv
-entity_id,name,state,aliases
+entity_id,name,state,aliases,supports_brightness,brightness
 {% for entity in exposed_entities -%}
-{{ entity.entity_id }},{{ entity.name }},{{ entity.state }},{{entity.aliases | join('/')}}
-{% endfor -%}
+  {%- set supports_brightness = 'No' -%}
+  {%- set brightness = 'N/A' -%}
+  {%- if 'supported_color_modes' in entity.attributes -%}
+    {%- if 'brightness' in entity.attributes.supported_color_modes -%}
+      {%- set supports_brightness = 'Yes' -%}
+      {%- if entity.state == 'on' -%}
+        {%- if 'brightness' in entity.attributes -%}
+          {%- set brightness = entity.attributes.brightness %}
+        {%- else -%}
+          {%- set brightness = 'N/A' %}
+        {%- endif -%}
+      {%- else -%}
+        {%- set brightness = '0' %}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+{{ entity.entity_id }},{{ entity.name }},{{ entity.state }},{{entity.aliases | join('/') }},{{ supports_brightness }},{{ brightness }}
+{% endfor %}
 ```
 
-The current state of devices is provided in available devices.
-Use execute_services function only for requested action, not for current states.
-Do not execute service without user's confirmation.
-Do not restate or appreciate what user says, rather make a quick inquiry.
+You are a mildly sarcastic personal assistant who is responsible for managing a smart home powered by Home Assistant. Based only on knowledge you know is factual, you will answer any question or act on any request that a user asks you. `Available Devices` is a list of devices that you can control in the smart home.
+
+For any request that you receive, first identify the intent by answering the following question:
+
+Is the user requesting information/status or is the user requesting you to take an action?
+
+If the user is requesting information or a status update about something you know (e.g. the state of a light or door), provide the answer and end your response. A request for information may also take the form of a conversation, such as asking about the weather, how you're feeling, asking for a joke, whether someone is home, or anything else along these lines. Do not make any function calls if information is being requested. If asked about any time or date related information, make sure to respond in a human readable format.
+
+If you determine the intent of the user is to ask you to perform an action, you can do so by using the `execute_services` function call. Be sure to properly fill out any function parameters using the `Availalbe Devices` list above or your previous knowledge of Home Assistant features. Do not leave any parameter undefined or in a default value. If you don't have enough information to execute a function call or smart home command, specify what other information you need. When changing the state of a light, always define a bightness level in the attributes
 """
 CONF_CHAT_MODEL = "chat_model"
 DEFAULT_CHAT_MODEL = "gpt-3.5-turbo-1106"
@@ -57,7 +75,7 @@ DEFAULT_CONF_FUNCTIONS = [
                             "properties": {
                                 "domain": {
                                     "type": "string",
-                                    "description": "The domain of the service",
+                                    "description": "The domain of the service, which is part of the entity_id, e.g. light.kitchen_lights has a domain of lights, and binary_sensor.fridge_door has a domain of binary_sensor",
                                 },
                                 "service": {
                                     "type": "string",
@@ -67,6 +85,10 @@ DEFAULT_CONF_FUNCTIONS = [
                                     "type": "object",
                                     "description": "The service data object to indicate what to control.",
                                     "properties": {
+                                        "brightness": {
+                                            "type": "integer",
+                                            "description": "Controls how bright a light wll be. 255 is 100%, 128 is 50%, 0 is 0%.",
+                                        },
                                         "entity_id": {
                                             "type": "string",
                                             "description": "The entity_id retrieved from available devices. It must start with domain, followed by dot character.",

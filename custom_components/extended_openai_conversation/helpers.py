@@ -37,7 +37,7 @@ from homeassistant.const import (
     SERVICE_RELOAD,
 )
 from homeassistant.core import HomeAssistant, State
-from homeassistant.exceptions import HomeAssistantError, ServiceNotFound
+from homeassistant.exceptions import HomeAssistantError, ServiceNotFound, ServiceValidationError 
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.script import Script
 from homeassistant.helpers.template import Template
@@ -223,8 +223,42 @@ class NativeFunctionExecutor(FunctionExecutor):
             return await self.get_statistics(
                 hass, function, arguments, user_input, exposed_entities
             )
+        if name == "get_user_from_user_id":
+            return await self.get_user_from_user_id(
+                hass, function, arguments, user_input, exposed_entities
+            )
 
         raise NativeNotFound(name)
+
+    RESERVED_KEYS = [
+        'context',
+        'last_updated',
+        'last_changed',
+        'entity_picture',
+        'friendly_name',
+        'icon',
+        'unit_of_measurement',
+        'device_class',
+        'restored',
+        'supported_color_modes',
+        'supported_features',
+    ]
+
+    ALLOWED_KEYS = {
+        "light": {
+            "turn_on": {
+                "entity_id": True,
+                "brightness": True,
+                "color_temp": False,
+                "color_xy": False,
+                "effect": False,
+                "transition": False,
+            },
+            "turn_off": {
+                "entity_id": True,
+            },
+        },
+    }
 
     async def execute_service_single(
         self,
@@ -233,26 +267,29 @@ class NativeFunctionExecutor(FunctionExecutor):
         service_argument,
         user_input: conversation.ConversationInput,
         exposed_entities,
-    ):
+    ) -> dict[str, Any]:
         domain = service_argument["domain"]
         service = service_argument["service"]
-        service_data = service_argument.get(
-            "service_data", service_argument.get("data", {})
-        )
+        service_data = service_argument.get("service_data", service_argument.get("data", {}))
+    
         entity_id = service_data.get("entity_id", service_argument.get("entity_id"))
-        area_id = service_data.get("area_id")
-        device_id = service_data.get("device_id")
-
         if isinstance(entity_id, str):
             entity_id = [e.strip() for e in entity_id.split(",")]
+    
         service_data["entity_id"] = entity_id
 
-        if entity_id is None and area_id is None and device_id is None:
+        area_id = service_data.get("area_id", service_argument.get("area_id"))
+        if isinstance(area_id, str):
+            area_id = [e.strip() for e in area_id.split(",")]
+    
+        service_data["area_id"] = area_id
+    
+        if entity_id is None and area_id is None:
             raise CallServiceError(domain, service, service_data)
+            
         if not hass.services.has_service(domain, service):
             raise ServiceNotFound(domain, service)
-        self.validate_entity_ids(hass, entity_id or [], exposed_entities)
-
+    
         try:
             await hass.services.async_call(
                 domain=domain,
@@ -262,8 +299,8 @@ class NativeFunctionExecutor(FunctionExecutor):
             return {"success": True}
         except HomeAssistantError as e:
             _LOGGER.error(e)
-            return {"error": str(e)}
-
+            return {"error": str(e)} 
+    
     async def execute_service(
         self,
         hass: HomeAssistant,
@@ -371,6 +408,17 @@ class NativeFunctionExecutor(FunctionExecutor):
     ):
         energy_manager: energy.data.EnergyManager = await energy.async_get_manager(hass)
         return energy_manager.data
+
+    async def get_user_from_user_id(
+        self,
+        hass: HomeAssistant,
+        function,
+        arguments,
+        user_input: conversation.ConversationInput,
+        exposed_entities,
+    ):
+        user = await hass.auth.async_get_user(user_input.context.user_id)
+        return {'name': user.name if user and hasattr(user, 'name') else 'Unknown'}
 
     async def get_statistics(
         self,

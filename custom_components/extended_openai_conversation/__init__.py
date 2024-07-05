@@ -139,6 +139,7 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         self.entry = entry
         self.history: dict[str, list[dict]] = {}
         base_url = entry.data.get(CONF_BASE_URL)
+        self.model = entry.options.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL)
         if is_azure(base_url):
             self.client = AsyncAzureOpenAI(
                 api_key=entry.data[CONF_API_KEY],
@@ -186,9 +187,9 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
             messages = [system_message]
         user_message = {"role": "user", "content": user_input.text}
         if self.entry.options.get(CONF_ATTACH_USERNAME, DEFAULT_ATTACH_USERNAME):
-            user = await self.hass.auth.async_get_user(user_input.context.user_id)
-            if user is not None and user.name is not None:
-                user_message[ATTR_NAME] = user.name
+            user = user_input.context.user_id
+            if user is not None:
+                user_message[ATTR_NAME] = user
 
         messages.append(user_message)
 
@@ -267,6 +268,7 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         for state in states:
             entity_id = state.entity_id
             entity = entity_registry.async_get(entity_id)
+            attributes = state.attributes  # Get the entity attributes
 
             aliases = []
             if entity and entity.aliases:
@@ -277,6 +279,7 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
                     "entity_id": entity_id,
                     "name": state.name,
                     "state": self.hass.states.get(entity_id).state,
+                    "attributes": attributes,  # Include the attributes
                     "aliases": aliases,
                 }
             )
@@ -330,7 +333,7 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         n_requests,
     ) -> OpenAIQueryResponse:
         """Process a sentence."""
-        model = self.entry.options.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL)
+        # model = self.entry.options.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL)
         max_tokens = self.entry.options.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS)
         top_p = self.entry.options.get(CONF_TOP_P, DEFAULT_TOP_P)
         temperature = self.entry.options.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE)
@@ -356,10 +359,10 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         if len(functions) == 0:
             tool_kwargs = {}
 
-        _LOGGER.info("Prompt for %s: %s", model, messages)
+        _LOGGER.info("Prompt for %s: %s", self.model, json.dumps(messages))
 
         response: ChatCompletion = await self.client.chat.completions.create(
-            model=model,
+            model=self.model,
             messages=messages,
             max_tokens=max_tokens,
             top_p=top_p,
@@ -368,7 +371,14 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
             **tool_kwargs,
         )
 
-        _LOGGER.info("Response %s", response.model_dump(exclude_none=True))
+        # if self.model == "gpt-4-0125-preview":
+        #     _LOGGER.info("Switching to gpt-35-turbo-0125")
+        #     self.model = "gpt-35-turbo-0125"
+        # elif self.model == "gpt-35-turbo-0125":
+        #     _LOGGER.info("Switching to gpt-4-0125-preview")
+        #     self.model = "gpt-4-0125-preview"
+
+        _LOGGER.info("Response %s", json.dumps(response.model_dump(exclude_none=True)))
 
         if response.usage.total_tokens > context_threshold:
             await self.truncate_message_history(messages, exposed_entities, user_input)

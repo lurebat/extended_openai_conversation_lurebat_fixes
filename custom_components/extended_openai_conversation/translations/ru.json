@@ -1,0 +1,72 @@
+{
+    "config": {
+        "error": {
+            "cannot_connect": "Невозможно подключиться",
+            "invalid_auth": "Неверная аутентификация",
+            "unknown": "Неизвестная ошибка"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "name": "Имя",
+                    "api_key": "API Ключ",
+                    "base_url": "Базовый URL",
+                    "api_version": "Версия API",
+                    "organization": "Организация",
+                    "skip_authentication": "Пропустить проверку подлинности"
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "max_tokens": "Максимальное количество токенов для ответа",
+                    "model": "Модель автодополнения",
+                    "prompt": "Шаблон запроса",
+                    "temperature": "Температура",
+                    "top_p": "Top P",
+                    "max_function_calls_per_conversation": "Максимальное количество вызовов функций за разговор",
+                    "functions": "Функции",
+                    "attach_username": "Прикрепить имя пользователя к сообщению",
+                    "use_tools": "Использовать инструменты",
+                    "context_threshold": "Порог контекста",
+                    "context_truncate_strategy": "Стратегия усечения контекста при превышении порога"
+                }
+            }
+        }
+    },
+    "services": {
+        "query_image": {
+            "name": "Запрос изображения",
+            "description": "Принимать изображения и отвечать на вопросы о них",
+            "fields": {
+                "config_entry": {
+                    "name": "Запись конфигурации",
+                    "description": "Запись конфигурации, используемая для этой службы"
+                },
+                "model": {
+                    "name": "Модель",
+                    "description": "Модель",
+                    "example": "gpt-4-vision-preview"
+                },
+                "prompt": {
+                    "name": "Вопрос",
+                    "description": "Текст вопроса об изображении",
+                    "example": "Что на этом изображении?"
+                },
+                "images": {
+                    "name": "Изображения",
+                    "description": "Список изображений для вопросов",
+                    "example": "{\"url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg\"}"
+                },
+                "max_tokens": {
+                    "name": "Максимальное количество токенов",
+                    "description": "Максимальное количество токенов",
+                    "example": "300"
+                }
+            }
+        }
+    }
+}
